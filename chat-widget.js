@@ -1,5 +1,5 @@
 // Chat Widget Script
-(function() {
+(() => {
     // Create and inject styles
     const styles = `
         .n8n-chat-widget {
@@ -252,24 +252,72 @@
             fill: currentColor;
         }
 
+        /* Entfernen des Footers */
         .n8n-chat-widget .chat-footer {
-            padding: 8px;
-            text-align: center;
+            display: none;
+        }
+
+        /* Ladeanimation für Nutzereingaben */
+        .n8n-chat-widget .loading-animation {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(133, 79, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--chat--color-primary);
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Bot-Denkanimation */
+        .n8n-chat-widget .thinking-animation {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            margin: 8px 0;
+            border-radius: 12px;
+            max-width: 80px;
+            align-self: flex-start;
             background: var(--chat--color-background);
-            border-top: 1px solid rgba(133, 79, 255, 0.1);
+            border: 1px solid rgba(133, 79, 255, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
-        .n8n-chat-widget .chat-footer a {
-            color: var(--chat--color-primary);
-            text-decoration: none;
-            font-size: 12px;
-            opacity: 0.8;
-            transition: opacity 0.2s;
-            font-family: inherit;
+        .n8n-chat-widget .thinking-dot {
+            height: 8px;
+            width: 8px;
+            margin: 0 2px;
+            background-color: var(--chat--color-primary);
+            border-radius: 50%;
+            display: inline-block;
+            opacity: 0.6;
         }
 
-        .n8n-chat-widget .chat-footer a:hover {
-            opacity: 1;
+        .n8n-chat-widget .thinking-dot:nth-child(1) {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        .n8n-chat-widget .thinking-dot:nth-child(2) {
+            animation: pulse 1.5s infinite ease-in-out 0.2s;
+        }
+
+        .n8n-chat-widget .thinking-dot:nth-child(3) {
+            animation: pulse 1.5s infinite ease-in-out 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(0.8);
+                opacity: 0.6;
+            }
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
         }
     `;
 
@@ -294,11 +342,8 @@
             logo: '',
             name: '',
             welcomeText: '',
-            responseTimeText: '',
-            poweredBy: {
-                text: 'Powered by n8n',
-                link: 'https://n8n.partnerlinks.io/m8a94i19zhqq?utm_source=nocodecreative.io'
-            }
+            responseTimeText: ''
+            // Entfernen der poweredBy-Konfiguration
         },
         style: {
             primaryColor: '',
@@ -366,9 +411,7 @@
                 <textarea placeholder="Type your message here..." rows="1"></textarea>
                 <button type="submit">Send</button>
             </div>
-            <div class="chat-footer">
-                <a href="${config.branding.poweredBy.link}" target="_blank">${config.branding.poweredBy.text}</a>
-            </div>
+            <!-- Footer entfernt -->
         </div>
     `;
     
@@ -395,6 +438,18 @@
         return crypto.randomUUID();
     }
 
+    // Funktion zum Erstellen der Denkanimation
+    function createThinkingAnimation() {
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'thinking-animation';
+        thinkingDiv.innerHTML = `
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+        `;
+        return thinkingDiv;
+    }
+
     async function startNewConversation() {
         currentSessionId = generateUUID();
         const data = [{
@@ -407,6 +462,15 @@
         }];
 
         try {
+            chatContainer.querySelector('.brand-header').style.display = 'none';
+            chatContainer.querySelector('.new-conversation').style.display = 'none';
+            chatInterface.classList.add('active');
+            
+            // Bot-Denkanimation hinzufügen
+            const thinkingAnimation = createThinkingAnimation();
+            messagesContainer.appendChild(thinkingAnimation);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
             const response = await fetch(config.webhook.url, {
                 method: 'POST',
                 headers: {
@@ -416,10 +480,10 @@
             });
 
             const responseData = await response.json();
-            chatContainer.querySelector('.brand-header').style.display = 'none';
-            chatContainer.querySelector('.new-conversation').style.display = 'none';
-            chatInterface.classList.add('active');
-
+            
+            // Denkanimation entfernen
+            messagesContainer.removeChild(thinkingAnimation);
+            
             const botMessageDiv = document.createElement('div');
             botMessageDiv.className = 'chat-message bot';
             botMessageDiv.textContent = Array.isArray(responseData) ? responseData[0].output : responseData.output;
@@ -447,6 +511,11 @@
         messagesContainer.appendChild(userMessageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
+        // Bot-Denkanimation hinzufügen
+        const thinkingAnimation = createThinkingAnimation();
+        messagesContainer.appendChild(thinkingAnimation);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
         try {
             const response = await fetch(config.webhook.url, {
                 method: 'POST',
@@ -457,6 +526,9 @@
             });
             
             const data = await response.json();
+            
+            // Denkanimation entfernen
+            messagesContainer.removeChild(thinkingAnimation);
             
             const botMessageDiv = document.createElement('div');
             botMessageDiv.className = 'chat-message bot';
@@ -495,9 +567,9 @@
 
     // Add close button handlers
     const closeButtons = chatContainer.querySelectorAll('.close-button');
-    closeButtons.forEach(button => {
+    for (const button of closeButtons) {
         button.addEventListener('click', () => {
             chatContainer.classList.remove('open');
         });
-    });
+    }
 })();
